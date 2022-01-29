@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="A tool to extract causality from natual language requirements."
+    />
+    <link rel="stylesheet" href="index.css" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico?v=2" />
+    <link
+      href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Copyright 1998-2021 by Northwoods Software Corporation. -->
+    <title>CATE</title>
+  </head>
+
+  <body
+    class="fixed flex flex-col h-screen w-full"
+    style="font-family: 'Montserrat', sans-serif"
+  >
+    <div class="flex items-center pl-5 w-full bg-blue-400 h-16 font-bold text-white text-xl py-2">CATE<span class="truncate font-medium">: <span class="font-bold">CA</span>usality <span class="font-bold">T</span>ree <span class="font-bold">E</span>xtractor from Natural Language Requirements</span></div>
+    <div class="flex flex-col md:flex-row h-full">
+      <form
+        class="
+          flex
+          flex-col
+          justify-between
+          items-stretch
+          overflow-y-scroll
+          h-full
+          w-1/3
+          bg-blue-50
+          border-0 md:border-1
+          border border-t-0 border-b-0 border-l-0 border-r-1 border-gray-400
+          p-5
+        "
+        style="min-width: 400px"
+        id="form"
+      >
+        <div class="w-full overflow-y-scroll" id="settings-box">
+          <p class="text-xl">Your Sentence</p>
+        <textarea class="w-full h-32 md:h-64 rounded-lg border-gray-300 p-5" name="sentence" id="sentence" placeholder="If Event A happens, then Event B shall be triggered."></textarea>
+        <div class="flex justify-between items-center pt-5">
+          <p class="text-lg py-0">Beam Width</p>
+          <input type="number" class="h-8 w-14 rounded-lg border-gray-300 p-1 pl-2" name="max_beams" id="max-beams" placeholder="5"></input>
+        </div>
+        <div class="flex justify-between items-center pt-5">
+          <div>
+            <p class="text-lg py-0">Temperature Scaling</p>
+            <p class="text-sm text-gray-500">BERT/Left Branching only</p>
+          </div>
+          <!-- Rounded switch -->
+          <label class="switch">
+            <input type="checkbox" id="temperature_scaling">
+            <span class="slider round" onClick="toggleSwitch()"></span>
+          </label>
+        </div>
+        <div class="flex flex-col justify-between items-baseline pt-5">
+          <p class="text-lg py-0">Dataset</p>
+          <div class="flex space-x-2 w-full pt-2" id="dataset">
+            <div onClick="changeSettings(this, 'dataset', 'left_branching')" class="dataset flex flex-grow justify-center items-center rounded-lg bg-blue-500 text-white text-lg font-bold px-3 py-1 hover:bg-blue-600 cursor-pointer">Left Branching</div>
+            <div onClick="changeSettings(this, 'dataset', 'right_branching')"  class="dataset flex flex-grow justify-center items-center rounded-lg bg-blue-400 text-white text-lg font-bold px-3 py-1 hover:bg-blue-600 cursor-pointer">Right Branching</div>
+          </div>
+
+        </div>
+        <div class="flex flex-col justify-between items-baseline pt-5">
+          <p class="text-lg py-0">Word Embeddings</p>
+          <div class="flex space-x-2 w-full pt-2" id="embeddings">
+            <div onClick="changeSettings(this, 'embeddings', 'BERT')" class="embeddings flex flex-grow justify-center items-center rounded-lg bg-blue-500 text-white text-lg font-bold px-3 py-1 hover:bg-blue-600 cursor-pointer">BERT</div>
+            <div onClick="changeSettings(this, 'embeddings', 'FastText')" class="embeddings flex flex-grow justify-center items-center rounded-lg bg-blue-400 text-white text-lg font-bold px-3 py-1 hover:bg-blue-600 cursor-pointer">FastText</div>
+            <div onClick="changeSettings(this, 'embeddings', 'random')" class="embeddings flex flex-grow justify-center items-center rounded-lg bg-blue-400 text-white text-lg font-bold px-3 py-1 hover:bg-blue-600 cursor-pointer">Random (300)</div>
+          </div>
+        </div>
+        </div>
+        
+        <div class="justify-self-end w-full mt-5">
+        <button action="" method="post" type="submit" class="flex justify-center items-center w-full rounded-lg focus:outline-none focus:bg-blue-700 bg-blue-500 text-white text-xl font-bold py-2 hover:bg-blue-600">Predict</button></div>
+      </form>
+      <div
+        class="h-full flex-grow"
+      >
+      <!-- * * * * * * * * * * * * * -->
+      <!-- Start of GoJS sample code -->
+
+      <script src="https://unpkg.com/gojs/release/go.js"></script>
+      <div>
+        <script id="code">
+          function init(input) {
+            var $ = go.GraphObject.make // for conciseness in defining templates
+            document.getElementById("myDiagramDiv").innerHTML = ''
+            myDiagram = $(go.Diagram, 'myDiagramDiv', {
+              allowCopy: false,
+              allowDelete: false,
+              allowMove: false,
+              initialAutoScale: go.Diagram.Uniform,
+              layout: $(
+                FlatTreeLayout, // custom Layout, defined below
+                {
+                  angle: 90,
+                  compaction: go.TreeLayout.CompactionNone,
+                }
+              ),
+              'undoManager.isEnabled': true,
+            })
+
+            myDiagram.nodeTemplate = $(
+              go.Node,
+              'Vertical',
+              { selectionObjectName: 'BODY' },
+              $(
+                go.Panel,
+                'Auto',
+                { name: 'BODY' },
+                $(
+                  go.Shape,
+                  'RoundedRectangle',
+                  new go.Binding('fill'),
+                  new go.Binding('stroke')
+                ),
+                $(
+                  go.TextBlock,
+                  {
+                    font: 'bold 12pt Arial, sans-serif',
+                    margin: new go.Margin(4, 2, 2, 2),
+                  },
+                  new go.Binding('text')
+                )
+              ),
+              $(
+                go.Panel, // this is underneath the "BODY"
+                { height: 17 }, // always this height, even if the TreeExpanderButton is not visible
+                $('TreeExpanderButton')
+              )
+            )
+
+            myDiagram.linkTemplate = $(
+              go.Link,
+              $(go.Shape, { strokeWidth: 1.5 })
+            )
+
+            function convertToNodeDataArray(input, array, parentKey) {
+              input = input.split('( ').join('(')
+              input = input.split(') ').join(')')
+              input = input.split(' (').join('(')
+              if (input[0] == '(') {
+                input = input.substring(1, input.length - 1)
+              }
+              if (!input.includes('(') && !input.includes(')')) {
+                if (parentKey == 0) {
+                  array.push({
+                    key: array.length + 1,
+                    text: input.split(' ')[0],
+                    fill: '#93C5FD',
+                    stroke: '#4d90fe',
+                  })
+                } else {
+                  array.push({
+                    key: array.length + 1,
+                    text: input.split(' ')[0],
+                    fill: '#93C5FD',
+                    stroke: '#4d90fe',
+                    parent: parentKey,
+                  })
+                }
+                array.push({
+                  key: array.length + 1,
+                  text: input.split(' ')[1],
+                  fill: '#EFF6FF',
+                  stroke: '#4d90fe',
+                  parent: array.length,
+                })
+              } else {
+                if (parentKey == 0) {
+                  array.push({
+                    key: array.length + 1,
+                    text: input.split('(')[0].split(' ')[0],
+                    fill: '#60A5FA',
+                    stroke: '#4d90fe',
+                  })
+                } else {
+                  array.push({
+                    key: array.length + 1,
+                    text: input.split('(')[0].split(' ')[0],
+                    fill: '#60A5FA',
+                    stroke: '#4d90fe',
+                    parent: parentKey,
+                  })
+                }
+                let openBrackets = 0
+                let openIndex = -1
+                let closeBrackets = 0
+                let substrings = []
+                for (let i = 0; i < input.length; i++) {
+                  if (input[i] == '(') {
+                    if (openBrackets == 0) {
+                      openIndex = i
+                      closeBrackets = 0
+                    }
+                    openBrackets++
+                  }
+                  if (input[i] == ')') {
+                    closeBrackets = closeBrackets + 1
+                    if (openBrackets == closeBrackets && openBrackets != 0) {
+                      substrings.push(input.substring(openIndex, i + 1))
+                      openBrackets = 0
+                      closeBrackets = 0
+                      openIndex = -1
+                    }
+                  }
+                }
+                const parentKeyCopy = array.length
+                for (const substring in substrings) {
+                  convertToNodeDataArray(substrings[substring], array, parentKeyCopy)
+                }
+              }
+              return array
+            }
+
+
+            // set up the nodeDataArray, describing each part of the sentence
+            var nodeDataArray = convertToNodeDataArray(input, [], 0)
+
+            // create the Model with data for the tree, and assign to the Diagram
+            myDiagram.model = $(go.TreeModel, { nodeDataArray: nodeDataArray })
+            return myDiagram
+          }
+
+          // Customize the TreeLayout to position all of the leaf nodes at the same vertical Y position.
+          function FlatTreeLayout() {
+            go.TreeLayout.call(this) // call base constructor
+          }
+          go.Diagram.inherit(FlatTreeLayout, go.TreeLayout)
+
+          // This assumes the TreeLayout.angle is 90 -- growing downward
+          FlatTreeLayout.prototype.commitLayout = function () {
+            go.TreeLayout.prototype.commitLayout.call(this) // call base method first
+            // find maximum Y position of all Nodes
+            var y = -Infinity
+            this.network.vertexes.each(function (v) {
+              y = Math.max(y, v.node.position.y)
+            })
+            // move down all leaf nodes to that Y position, but keeping their X position
+            this.network.vertexes.each(function (v) {
+              if (v.destinationEdges.count === 0) {
+                // shift the node down to Y
+                v.node.position = new go.Point(v.node.position.x, y)
+                // extend the last segment vertically
+                v.node.toEndSegmentLength = Math.abs(v.centerY - y)
+              } else {
+                // restore to normal value
+                v.node.toEndSegmentLength = 10
+              }
+            })
+          }
+        </script>
+      </div>
+      <!-- * * * * * * * * * * * * * -->
+      <div class="flex flex-col w-full h-full">
+        <div class="w-full border border-t-0 border-b-1 border-l-0 border-r-0 border-gray-400 p-5 py-2 text-xl font-bold text-gray-500 hidden" id="result">Got result in <span id="result-seconds"class="text-blue-600">20.5s</span></div>
+        <div id="sample w-full" style="height: 100%; width: 100%; padding: 20px;">
+          <div
+            id="loading"
+            class="flex items-center justify-center w-full hidden"
+            style="height: 100%; width: 100%;"
+          ><div class="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div></div>
+          
+          <div
+          id="myDiagramDiv"
+          class="w-full"
+          style="height: 100%; width: 100%;"></div>
+  
+        <div class="betternet-wrapper"></div>
+        <!--  End of GoJS sample code  -->
+      </div>
+      
+    </div>
+    <script>
+      var formEl = document.getElementById('form');
+      let diagram = null
+
+      let settings = {
+        dataset: "left_branching",
+        embeddings: "BERT",
+        temperature_scaling: true
+      }
+
+      function toggleSwitch() {
+        console.log('clicked')
+        settings['temperature_scaling'] = !settings['temperature_scaling']
+        console.log(settings)
+      }
+
+      function changeSettings(event, key, value) {
+        settings[key] = value
+        var links = document.querySelectorAll('.' + key);
+        // Loop through each link
+        for (var i = 0; i < links.length; i++) {
+
+          // Remove the .active class
+          links[i].classList.remove('bg-blue-500');
+          links[i].classList.add('bg-blue-400');
+          event.classList.remove('bg-blue-400');
+          event.classList.add('bg-blue-500');
+
+        }
+      }
+      formEl.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        // 1. Setup the request
+        // ================================
+        // 1.1 Headers
+        var headers = new Headers();
+        // Tell the server we want JSON back
+        // headers.append("Content-Type", "application/json");
+        headers.append("Access-Control-Allow-Origin", "*");
+
+        if (formEl['sentence'].value == undefined || formEl['sentence'].value.split(" ").length < 2) {
+          alert("Need at least two tokens/words as input.")
+          return
+        }
+        // 1.2 Form Data
+        // We need to properly format the submitted fields.
+        // Here we will use the same format the browser submits POST forms.
+        // You could use a different format, depending on your server, such
+        // as JSON or XML.
+        var json = {}
+        for (var i = 0; i < formEl.length; ++i) {
+          if (formEl[i] != "" && formEl[i].value != "" && formEl[i].value != undefined) {
+            json[formEl[i].name] = formEl[i].value;
+          }
+        }
+        
+        json = {
+          ...settings,
+          'max_beams': 5,
+          ...json
+        }
+        // 2. Make the request
+        // ================================
+        var url = '/predict';
+        var fetchOptions = {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(json),
+          redirect: 'follow',
+          mode: 'cors'
+        };
+        document.getElementById("loading").classList.toggle("hidden");
+        document.getElementById("myDiagramDiv").classList.toggle("hidden");
+        if (!document.getElementById("result").classList.contains("hidden")){
+          document.getElementById("result").classList.toggle("hidden");
+        }
+
+        var t0 = performance.now()
+        var responsePromise = fetch(url, fetchOptions);
+        
+        // 3. Use the response
+        // ================================
+        responsePromise
+          .then(async function(response) {
+            text = await response.text();
+            if (response.ok) {
+              var t1 = performance.now()
+              document.getElementById("loading").classList.toggle("hidden");
+              document.getElementById("myDiagramDiv").classList.toggle("hidden");
+              document.getElementById("result").classList.toggle("hidden");
+              document.getElementById("result-seconds").innerHTML = ((t1 - t0) / 1000).toFixed(2) + "s"
+
+              if (diagram != null) {
+                diagram.div = null
+              }
+              diagram = init(text)
+            } else {
+              alert("An Error has occurred. Try reducing the beam width or a shorter sentence.")
+              document.getElementById("loading").classList.toggle("hidden");
+              document.getElementById("myDiagramDiv").classList.toggle("hidden");
+            }
+          })
+          .catch(error => {
+            alert("An Error has occurred. Try reducing the beam width or a shorter sentence.")
+            document.getElementById("loading").classList.toggle("hidden");
+            document.getElementById("myDiagramDiv").classList.toggle("hidden");
+            console.error(error)
+          })
+      });
+    </script>
+  </body>
+</html>
