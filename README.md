@@ -1,2 +1,1 @@
-# CATE: CAusality Tree Extractor from Natural
-Language Requirements
+# CATE: CAusality Tree Extractor from Natural Language Requirements
